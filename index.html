@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>将棋順位戦 最終局シミュレーター</title>
+    <style>
+        body { font-family: "Helvetica Neue", Arial, sans-serif; background-color: #f9f7f2; margin: 20px; }
+        .container { max-width: 1000px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h2 { border-left: 5px solid #8b4513; padding-left: 10px; color: #5d2e0a; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th { background-color: #f2ede4; font-size: 0.9em; }
+        /* 昇級圏内（上位3名） */
+        .promotion-zone { background-color: #e3f2fd; font-weight: bold; border: 2px solid #2196f3; } 
+        .btn-update { 
+            display: block; width: 220px; margin: 20px auto; padding: 15px; 
+            background-color: #2c3e50; color: white; border: none; border-radius: 5px; 
+            font-size: 1.1em; cursor: pointer;
+        }
+        .btn-update:hover { background-color: #34495e; }
+        .rank-badge { font-size: 0.8em; color: #777; }
+        #summary { text-align: center; font-size: 1.3em; color: #1565c0; font-weight: bold; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>将棋順位戦 最終局シミュレーター (昇級3名)</h2>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>順位</th>
+                <th>棋士名 (前期)</th>
+                <th>対局相手</th>
+                <th>成績</th>
+                <th>最終局</th>
+                <th>最終成績</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody">
+            </tbody>
+    </table>
+
+    <button class="btn-update" onclick="calculateRanking()">更新して並び替え</button>
+
+    <div id="summary"></div>
+</div>
+
+<script>
+// 1. データ設定 (対局相手 Aite1~7 を追加)
+let players = [
+    { id: 1, name: "都成竜馬", prevRank: 10, win: 8, lose: 1, opponent: "杉本昌" },
+    { id: 2, name: "西田拓也", prevRank: 13, win: 8, lose: 1, opponent: "三枚堂" },
+    { id: 3, name: "岡部怜央", prevRank: 29, win: 8, lose: 1, opponent: "中川" },
+    { id: 4, name: "杉本昌隆", prevRank: 1, win: 7, lose: 2, opponent: "都成" },
+    { id: 5, name: "三枚堂達也", prevRank: 12, win: 7, lose: 2, opponent: "西田" },
+    { id: 6, name: "高田明浩", prevRank: 19, win: 7, lose: 2, opponent: "先崎" },
+    { id: 7, name: "飯塚祐紀", prevRank: 23, win: 7, lose: 2, opponent: "出口" }
+];
+
+// 初期テーブル作成
+function initTable() {
+    calculateRanking(); 
+}
+
+function calculateRanking() {
+    // 現在の入力値を反映
+    let currentData = players.map(p => {
+        const selectEl = document.getElementById(`result-${p.id}`);
+        // 初回実行時はselectが存在しないのでデフォルト'win'とする
+        const isWin = selectEl ? selectEl.value === 'win' : true;
+        
+        return {
+            ...p,
+            finalWin: p.win + (isWin ? 1 : 0),
+            finalLose: p.lose + (isWin ? 0 : 1),
+            isWinNow: isWin
+        };
+    });
+
+    // ソート：勝数(降) > 前期順位(昇)
+    currentData.sort((a, b) => {
+        if (b.finalWin !== a.finalWin) return b.finalWin - a.finalWin;
+        return a.prevRank - b.prevRank;
+    });
+
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = '';
+    
+    currentData.forEach((p, index) => {
+        const tr = document.createElement('tr');
+        // 上位3名を昇級圏内としてハイライト
+        if (index < 3) tr.className = 'promotion-zone';
+
+        tr.innerHTML = `
+            <td>${index + 1}位</td>
+            <td>${p.name} <span class="rank-badge">(前${p.prevRank})</span></td>
+            <td>vs ${p.opponent}</td>
+            <td>${p.win}-${p.lose}</td>
+            <td>
+                <select id="result-${p.id}">
+                    <option value="win" ${p.isWinNow ? 'selected' : ''}>○ 勝</option>
+                    <option value="lose" ${!p.isWinNow ? 'selected' : ''}>● 負</option>
+                </select>
+            </td>
+            <td>${p.finalWin}勝 - ${p.finalLose}敗</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    // 結果サマリー (上位3名)
+    const top3 = currentData.slice(0, 3).map(p => p.name).join('、');
+    document.getElementById('summary').innerText = `【昇級圏内】 ${top3}`;
+}
+
+// 実行
+initTable();
+</script>
+
+</body>
+</html>
