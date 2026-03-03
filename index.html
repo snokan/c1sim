@@ -21,7 +21,10 @@
         th:nth-child(5) { width: 18%; }
         th:nth-child(6) { width: 12%; }
 
+        /* 昇級圏内（青） */
         .promotion-zone { background-color: #e3f2fd; font-weight: bold; }
+        /* 昇級確定（赤） */
+        .confirmed-zone { background-color: #ffebee !important; color: #d32f2f; font-weight: bold; }
         
         .btn-update { display: block; width: 100%; max-width: 300px; margin: 20px auto; padding: 15px; background-color: #2c3e50; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1em; }
         .btn-update:hover { background-color: #34495e; }
@@ -115,12 +118,55 @@ function applyRules(data) {
     });
 }
 
+// 昇級確定かどうかを判定する関数
+function isPromotionConfirmed(targetName, baseData) {
+    const undecided = baseData.filter(p => p.isWinNow === null);
+    const independentPlayers = [];
+    const seenPair = new Set();
+    undecided.forEach(p => {
+        const opp = matchPairs[p.name];
+        if (!seenPair.has(p.name)) {
+            independentPlayers.push(p);
+            seenPair.add(p.name);
+            if (opp) seenPair.add(opp);
+        }
+    });
+
+    for (let i = 0; i < (1 << independentPlayers.length); i++) {
+        let temp = JSON.parse(JSON.stringify(baseData));
+        independentPlayers.forEach((p, idx) => {
+            let isWin = (i >> idx) & 1;
+            let targetP = temp.find(x => x.id === p.id);
+            targetP.isTemp = isWin ? "win" : "lose";
+            targetP.finalWin = targetP.win + (isWin ? 1 : 0);
+            targetP.finalLose = targetP.lose + (isWin ? 0 : 1);
+        });
+        applyRules(temp);
+        // 1パターンでも3位以内に入れないパターンがあれば「確定」ではない
+        if (!sortRanking(temp).slice(0, 3).some(x => x.name === targetName)) {
+            return false;
+        }
+    }
+    return true; 
+}
+
 function updateTable(data) {
     const sorted = sortRanking(data), tbody = document.getElementById('tableBody');
     tbody.innerHTML = '';
+    
+    // 確定リストを作成
+    const confirmedList = sorted.filter(p => isPromotionConfirmed(p.name, data)).map(p => p.name);
+
     sorted.forEach((p, i) => {
         const tr = document.createElement('tr');
-        if (i < 3) tr.className = 'promotion-zone';
+        const isConfirmed = confirmedList.includes(p.name);
+        
+        if (isConfirmed) {
+            tr.className = 'confirmed-zone';
+        } else if (i < 3) {
+            tr.className = 'promotion-zone';
+        }
+
         tr.innerHTML = `<td>${i+1}位</td><td>${p.name}(${p.prevRank})</td><td>${p.opponent}</td><td>${p.win}-${p.lose}</td>
             <td class="td-select"><select class="win-select" id="result-${p.id}" onchange="onResultChange('${p.name}', this.value)">
                 <option value="">-</option><option value="win" ${p.isWinNow===true?'selected':''}>○</option>
@@ -223,16 +269,16 @@ function updateAll() {
     const area = document.getElementById("patternArea");
     area.innerHTML = "<h3>【全員の昇級条件解析】</h3>";
 
-    // 取得した data（最新の最終成績が含まれる）を使って表示を構築
     data.forEach(player => {
         const patterns = getPromotionPatterns(player.name, data);
         const section = document.createElement("div");
-        
-        // player.finalWin と player.finalLose を使うことで、シミュレーション結果を反映
         const scoreText = `${player.finalWin}勝${player.finalLose}敗`;
 
         if (patterns) {
-            section.className = "player-cond-section";
+            // 確定している場合はスタイルを変更
+            const isConfirmed = patterns.length === 1 && patterns[0] === "確定";
+            section.className = "player-cond-section" + (isConfirmed ? " confirmed-zone" : "");
+            
             let html = `<h3>${player.name} (${scoreText})</h3><ul class="pattern-list">`;
             patterns.forEach(pt => { html += `<li>${pt}</li>`; });
             html += `</ul>`;
@@ -248,6 +294,4 @@ function updateAll() {
 updateAll();
 </script>
 </body>
-
 </html>
-
